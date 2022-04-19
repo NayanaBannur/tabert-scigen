@@ -95,18 +95,15 @@ class TableDataset(Dataset):
 
     def __getitem__(self, index):
         target_ids = self.target[index]["input_ids"].squeeze()
-        table = [self.tables[index]]
-        context = [self.contexts[index]]
-        tensor_dict, instances = self.encoder.to_tensor_dict(context, table)
+        table = self.tables[index]
+        context = self.contexts[index]
+        return {"table": table, "context": context, "target_ids": target_ids}
+
+    def collate_fn(self, batch):
+        tensor_dict, instances = self.encoder.to_tensor_dict(batch["context"], batch["table"])
         tensor_dict = {
             k: v.to(self.encoder.device) if torch.is_tensor(v) else v
             for k, v in tensor_dict.items()
         }
-        return {"tensor_dict": tensor_dict, "target_ids": target_ids}
-
-    def collate_fn(self, batch):
-        tensor_dict_collate = {}
-        for key in tensor_dict_collate.keys():
-            tensor_dict_collate[key] = torch.stack([x[key] for x in batch])
         target_ids = torch.stack([x["target_ids"] for x in batch])
-        return {"tensor_dict": tensor_dict_collate, "target_ids": target_ids}
+        return {"tensor_dict": tensor_dict, "target_ids": target_ids}

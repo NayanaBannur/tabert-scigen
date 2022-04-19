@@ -314,7 +314,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         dataset = TableDataset(self.encoder, self.tokenizer_encoder, self.tokenizer_decoder, type_path=type_path,
                                **self.dataset_kwargs)
         logger.info('loading %s dataloader...', type_path)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4,
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0,
                                 collate_fn=dataset.collate_fn)
         logger.info('done')
         return dataloader
