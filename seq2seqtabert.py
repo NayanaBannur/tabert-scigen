@@ -151,8 +151,8 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         encoding = torch.cat([context_encoding, schema_encoding], dim=1)
         mask = torch.cat([tensor_dict['context_token_mask'], tensor_dict['column_mask']], dim=1)
 
-        return self.decoder.forward(input_ids=encoding, attention_mask=mask, decoder_input_ids=decoder_input_ids,
-                                    labels=labels)
+        return self.decoder.forward(input_ids=None, attention_mask=mask, encoder_outputs=encoding,
+                                    decoder_input_ids=decoder_input_ids, labels=labels)
 
     def _step(self, batch):
         pad_token_id = self.tokenizer_decoder.pad_token_id
@@ -181,13 +181,14 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         mask = torch.cat([tensor_dict['context_token_mask'], tensor_dict['column_mask']], dim=1)
         # NOTE: the following kwargs get more speed and lower quality summaries than those in evaluate_cnn.py
         generated_ids = self.decoder.generate(
-            input_ids=encoding,
+            input_ids=None,
             attention_mask=mask,
+            encoder_outputs=encoding,
             num_beams=5,
             max_length=512,
             length_penalty=5.0,
             early_stopping=True,
-            use_cache=True,
+            use_cache=True
         )
         preds = [
             self.tokenizer_decoder.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=True)
