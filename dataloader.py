@@ -73,17 +73,18 @@ def get_tables(data_dir='./data/dataset/train/few-shot/', file='train.json', tok
 class TableDataset(Dataset):
     def __init__(
             self,
-            tokenizer_encoder,
+            encoder,
             tokenizer_decoder,
             data_dir=None,
             type_path="train",
             max_target_length=512
     ):
         super().__init__()
-        self.encoder_tokenizer = tokenizer_encoder
+        self.encoder = encoder
+        self.encoder_tokenizer = encoder.tokenizer
         self.decoder_tokenizer = tokenizer_decoder
 
-        self.tables, self.contexts = get_tables(tokenizer=tokenizer_encoder)
+        self.tables, self.contexts = get_tables(tokenizer=self.encoder_tokenizer)
 
         self.target = encode_file_bart(tokenizer_decoder, os.path.join(data_dir, type_path + ".target"),
                                        max_target_length)
@@ -95,10 +96,16 @@ class TableDataset(Dataset):
         target_ids = self.target[index]["input_ids"].squeeze()
         table = self.tables[index]
         context = self.contexts[index]
-        return {"table": table, "context": context, "target_ids": target_ids}
+        tensor_dict, instances = self.encoder.to_tensor_dict(context, table)
+        tensor_dict = {
+            k: v.to(self.encoder.device) if torch.is_tensor(v) else v
+            for k, v in tensor_dict.items()
+        }
+        return {"tensor_dict": tensor_dict, "target_ids": target_ids}
 
     def collate_fn(self, batch):
-        table = torch.stack([x["table"] for x in batch])
-        context = torch.stack([x["context"] for x in batch])
+        tensor_dict_collate = {}
+        for key in tensor_dict_collate.keys():
+            tensor_dict_collate[key] = torch.stack([x[key] for x in batch])
         target_ids = torch.stack([x["target_ids"] for x in batch])
-        return {"table": table, "context": context, "target_ids": target_ids}
+        return {"tensor_dict": tensor_dict_collate, "target_ids": target_ids}

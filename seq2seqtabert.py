@@ -143,22 +143,24 @@ class Seq2SeqTableBertModel(pl.LightningModule):
             ),
         )
 
-    def forward(self, table=None, context=None, decoder_input_ids=None, labels=None):
-        context_encoding, schema_encoding, info_dict = self.encoder.encode(
-            contexts=[context],
-            tables=[table]
-        )
-        encoding = torch.cat([context_encoding, schema_encoding], dim=1)
+    def forward(self, tensor_dict=None, decoder_input_ids=None, labels=None):
+        context_encoding, schema_encoding = self.forward(**tensor_dict)
+        tensor_dict['context_token_mask'] = tensor_dict['context_token_mask'][:, 0, :]
+        tensor_dict['column_mask'] = tensor_dict['table_mask'][:, 0, :]
 
-        return self.decoder.forward(input_ids=encoding, decoder_input_ids=decoder_input_ids, labels=labels)
+        encoding = torch.cat([context_encoding, schema_encoding], dim=1)
+        mask = torch.cat([tensor_dict['context_token_mask'], tensor_dict['column_mask']], dim=1)
+
+        return self.decoder.forward(input_ids=encoding, attention_mask=mask, decoder_input_ids=decoder_input_ids,
+                                    labels=labels)
 
     def _step(self, batch):
         pad_token_id = self.tokenizer_decoder.pad_token_id
-        table, context, y = batch["table"], batch["context"], batch["target_ids"]
+        tensor_dict, y = batch["tensor_dict"], batch["target_ids"]
         y_ids = y[:, :-1].contiguous()
         labels = y[:, 1:].clone()
         labels[y[:, 1:] == pad_token_id] = -100
-        outputs = self(table=table, context=context, decoder_input_ids=y_ids, labels=labels)
+        outputs = self(tensor_dict=tensor_dict, decoder_input_ids=y_ids, labels=labels)
         loss = outputs[0]
 
         return loss
@@ -170,15 +172,17 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         return {"loss": loss, "log": tensorboard_logs}
 
     def _generation_common(self, batch):
-        table, context, y = batch
-        context_encoding, schema_encoding, info_dict = self.encoder.encode(
-            contexts=[self.tokenizer_encoder.tokenize(context)],
-            tables=[table]
-        )
+        tensor_dict, y = batch["tensor_dict"], batch["target_ids"]
+        context_encoding, schema_encoding = self.forward(**tensor_dict)
+        tensor_dict['context_token_mask'] = tensor_dict['context_token_mask'][:, 0, :]
+        tensor_dict['column_mask'] = tensor_dict['table_mask'][:, 0, :]
+
         encoding = torch.cat([context_encoding, schema_encoding], dim=1)
+        mask = torch.cat([tensor_dict['context_token_mask'], tensor_dict['column_mask']], dim=1)
         # NOTE: the following kwargs get more speed and lower quality summaries than those in evaluate_cnn.py
         generated_ids = self.decoder.generate(
             input_ids=encoding,
+            attention_mask=mask,
             num_beams=5,
             max_length=512,
             length_penalty=5.0,
@@ -309,7 +313,8 @@ class Seq2SeqTableBertModel(pl.LightningModule):
     def get_dataloader(self, type_path: str, batch_size: int, shuffle: bool = False) -> DataLoader:
         dataset = TableDataset(self.tokenizer_encoder, self.tokenizer_decoder, type_path=type_path, **self.dataset_kwargs)
         logger.info('loading %s dataloader...', type_path)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4,
+                                collate_fn=dataset.collate_fn)
         logger.info('done')
         return dataloader
 
