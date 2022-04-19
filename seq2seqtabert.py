@@ -79,6 +79,8 @@ class Seq2SeqTableBertModel(pl.LightningModule):
             cache_dir=cache_dir,
         )
 
+        self.tokenizer_encoder = self.encoder.tokenizer
+
         self.tokenizer_decoder = BartTokenizer.from_pretrained(
             self.hparams.tokenizer_name if self.hparams.tokenizer_name else self.hparams.model_name_or_path,
             cache_dir=cache_dir,
@@ -170,7 +172,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
     def _generation_common(self, batch):
         table, context, y = batch
         context_encoding, schema_encoding, info_dict = self.encoder.encode(
-            contexts=[self.encoder.tokenizer.tokenize(context)],
+            contexts=[self.tokenizer_encoder.tokenize(context)],
             tables=[table]
         )
         encoding = torch.cat([context_encoding, schema_encoding], dim=1)
@@ -305,7 +307,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
             writer.close()
 
     def get_dataloader(self, type_path: str, batch_size: int, shuffle: bool = False) -> DataLoader:
-        dataset = TableDataset(self.tokenizer_decoder, type_path=type_path, **self.dataset_kwargs)
+        dataset = TableDataset(self.tokenizer_encoder, self.tokenizer_decoder, type_path=type_path, **self.dataset_kwargs)
         logger.info('loading %s dataloader...', type_path)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4)
         logger.info('done')

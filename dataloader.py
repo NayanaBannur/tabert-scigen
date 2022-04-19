@@ -67,19 +67,19 @@ def get_tables(data_dir='./data/dataset/train/few-shot/', file='train.json'):
 class TableDataset(Dataset):
     def __init__(
             self,
-            encoder_tokenizer,
-            decoder_tokenizer,
+            tokenizer_encoder,
+            tokenizer_decoder,
             data_dir=None,
             type_path="train",
             max_target_length=512
     ):
         super().__init__()
-        self.encoder_tokenizer = encoder_tokenizer
-        self.decoder_tokenizer = decoder_tokenizer
+        self.encoder_tokenizer = tokenizer_encoder
+        self.decoder_tokenizer = tokenizer_decoder
 
         self.tables, self.contexts = get_tables()
 
-        self.target = encode_file_bart(decoder_tokenizer, os.path.join(data_dir, type_path + ".target"),
+        self.target = encode_file_bart(tokenizer_decoder, os.path.join(data_dir, type_path + ".target"),
                                        max_target_length)
 
     def __len__(self):
