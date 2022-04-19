@@ -24,7 +24,7 @@ from transformers import (
 )
 
 from callbacks import get_checkpoint_callback, get_early_stopping_callback
-from table_bert import TableBertConfig
+from table_bert import TableBertConfig, TableBertModel
 from utils.scigen_utils import convert_text, eval_sacre_bleu, eval_mover_score
 from dataloader import TableDataset
 
@@ -65,7 +65,11 @@ class Seq2SeqTableBertModel(pl.LightningModule):
             **config_kwargs
         )
 
-        self.config_encoder = TableBertConfig.from_pretrained(MODEL)
+        self.encoder = TableBertModel.from_pretrained(
+            '/Users/nayana/Desktop/CMU/Spring 2022/10-707/TaBERT/tabert_base_k3/model.bin',
+        )
+
+        self.config_encoder = self.encoder.config
 
         self.config = EncoderDecoderConfig.from_encoder_decoder_configs(self.config_encoder, self.config_decoder)
 
