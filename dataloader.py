@@ -100,7 +100,9 @@ class TableDataset(Dataset):
         return {"table": table, "context": context, "target_ids": target_ids}
 
     def collate_fn(self, batch):
-        tensor_dict, instances = self.encoder.to_tensor_dict(batch["context"], batch["table"])
+        contexts = [x["context"] for x in batch]
+        tables = [x["table"] for x in batch]
+        tensor_dict, instances = self.encoder.to_tensor_dict(contexts, tables)
         tensor_dict = {
             k: v.to(self.encoder.device) if torch.is_tensor(v) else v
             for k, v in tensor_dict.items()
