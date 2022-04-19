@@ -34,7 +34,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG,
                     format='%(asctime)s %(module)s - %(funcName)s: %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
 
-ENCODER_PATH = '/Users/nayana/Desktop/CMU/Spring 2022/10-707/TaBERT/tabert_base_k3/'
+ENCODER_PATH = './tabert_base_k3/'
 
 
 def set_seed(args: argparse.Namespace):
@@ -55,7 +55,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
         cache_dir = self.hparams.cache_dir if self.hparams.cache_dir else None
 
-        self.config_encoder = TableBertConfig.from_file(f'{ENCODER_PATH}/tb_config.bin')
+        self.config_encoder = TableBertConfig.from_file(f'{ENCODER_PATH}/tb_config.json')
 
         self.config_decoder = BartConfig.from_pretrained(
             self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path,
@@ -66,7 +66,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         )
 
         self.encoder = TableBertModel.from_pretrained(
-            '/Users/nayana/Desktop/CMU/Spring 2022/10-707/TaBERT/tabert_base_k3/model.bin',
+            f'{ENCODER_PATH}/model.bin',
         )
 
         self.decoder = BartForConditionalGeneration.from_pretrained(
