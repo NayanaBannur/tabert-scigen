@@ -145,7 +145,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
     def forward(self, table=None, context=None, decoder_input_ids=None, labels=None):
         context_encoding, schema_encoding, info_dict = self.encoder.encode(
-            contexts=[self.encoder.tokenizer.tokenize(context)],
+            contexts=[context],
             tables=[table]
         )
         encoding = torch.cat([context_encoding, schema_encoding], dim=1)

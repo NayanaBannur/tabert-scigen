@@ -23,7 +23,7 @@ def encode_file_bart(tokenizer, texts, max_length, pad_to_max_length=True, retur
     return examples
 
 
-def get_tables(data_dir='./data/dataset/train/few-shot/', file='train.json'):
+def get_tables(data_dir='./data/dataset/train/few-shot/', file='train.json', tokenizer=None):
     path = os.path.join(data_dir, file)
 
     with open(path, 'r') as f:
@@ -58,8 +58,14 @@ def get_tables(data_dir='./data/dataset/train/few-shot/', file='train.json'):
             data=sample_dict["table_content_values"]
         )
 
+        if tokenizer is not None:
+            table = table.tokenize(tokenizer)
+            context = tokenizer.tokenize(sample_dict["table_caption"])
+        else:
+            context = sample_dict["table_caption"]
+
         tables.append(table)
-        contexts.append(sample_dict["table_caption"])
+        contexts.append(context)
 
     return tables, contexts
 
@@ -77,7 +83,7 @@ class TableDataset(Dataset):
         self.encoder_tokenizer = tokenizer_encoder
         self.decoder_tokenizer = tokenizer_decoder
 
-        self.tables, self.contexts = get_tables()
+        self.tables, self.contexts = get_tables(tokenizer=tokenizer_encoder)
 
         self.target = encode_file_bart(tokenizer_decoder, os.path.join(data_dir, type_path + ".target"),
                                        max_target_length)
@@ -89,4 +95,10 @@ class TableDataset(Dataset):
         target_ids = self.target[index]["input_ids"].squeeze()
         table = self.tables[index].tokenize(self.encoder_tokenizer)
         context = self.encoder_tokenizer.tokenize(self.contexts[index])
+        return {"table": table, "context": context, "target_ids": target_ids}
+
+    def collate_fn(self, batch):
+        table = torch.stack([x["table"] for x in batch])
+        context = torch.stack([x["context"] for x in batch])
+        target_ids = torch.stack([x["target_ids"] for x in batch])
         return {"table": table, "context": context, "target_ids": target_ids}
