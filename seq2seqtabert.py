@@ -46,6 +46,9 @@ def set_seed(args: argparse.Namespace):
 
 
 class Seq2SeqTableBertModel(pl.LightningModule):
+
+    val_metric = "mover"
+
     def __init__(self, hparams: argparse.Namespace, num_labels=None, **config_kwargs):
         """Initialize a model."""
 
