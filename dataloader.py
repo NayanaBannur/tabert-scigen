@@ -74,6 +74,7 @@ class TableDataset(Dataset):
     def __init__(
             self,
             encoder,
+            tokenizer_encoder,
             tokenizer_decoder,
             data_dir=None,
             type_path="train",
@@ -81,7 +82,7 @@ class TableDataset(Dataset):
     ):
         super().__init__()
         self.encoder = encoder
-        self.encoder_tokenizer = encoder.tokenizer
+        self.encoder_tokenizer = tokenizer_encoder
         self.decoder_tokenizer = tokenizer_decoder
 
         self.tables, self.contexts = get_tables(tokenizer=self.encoder_tokenizer)
