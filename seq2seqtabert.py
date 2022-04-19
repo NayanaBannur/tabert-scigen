@@ -72,7 +72,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         self.decoder = BartForConditionalGeneration.from_pretrained(
             self.hparams.model_name_or_path,
             from_tf=bool(".ckpt" in self.hparams.model_name_or_path),
-            config=self.config,
+            config=self.config_decoder,
             cache_dir=cache_dir,
         )
 
@@ -87,7 +87,6 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
         self.dataset_kwargs: dict = dict(
             data_dir=self.hparams.data_dir,
-            max_source_length=self.hparams.max_source_length,
             max_target_length=self.hparams.max_target_length,
         )
         self.count_valid_epoch = 0
@@ -483,8 +482,7 @@ def main(args):
         logger.info("args.data_dir: %s", args.data_dir)
         model.dataset_kwargs: dict = dict(
             data_dir=args.data_dir,
-            max_source_length=args.max_source_length,
-            max_target_length=args.max_target_length,
+            max_target_length=args.max_target_length
         )
         model.hparams = args
 
@@ -508,8 +506,7 @@ def main(args):
                 model = model.load_from_checkpoint(checkpoints[-1])
                 model.dataset_kwargs: dict = dict(
                     data_dir=args.data_dir,
-                    max_source_length=args.max_source_length,
-                    max_target_length=args.max_target_length,
+                    max_target_length=args.max_target_length
                 )
                 model.hparams = args
 

@@ -71,7 +71,7 @@ class TableDataset(Dataset):
             decoder_tokenizer,
             data_dir=None,
             type_path="train",
-            max_target_length=512,
+            max_target_length=512
     ):
         super().__init__()
         self.encoder_tokenizer = encoder_tokenizer
