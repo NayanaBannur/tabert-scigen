@@ -144,7 +144,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         )
 
     def forward(self, tensor_dict=None, decoder_input_ids=None, labels=None):
-        context_encoding, schema_encoding = self.forward(**tensor_dict)
+        context_encoding, schema_encoding = self.encoder.forward(**tensor_dict)
         tensor_dict['context_token_mask'] = tensor_dict['context_token_mask'][:, 0, :]
         tensor_dict['column_mask'] = tensor_dict['table_mask'][:, 0, :]
 
@@ -173,7 +173,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
     def _generation_common(self, batch):
         tensor_dict, y = batch["tensor_dict"], batch["target_ids"]
-        context_encoding, schema_encoding = self.forward(**tensor_dict)
+        context_encoding, schema_encoding = self.encoder.forward(**tensor_dict)
         tensor_dict['context_token_mask'] = tensor_dict['context_token_mask'][:, 0, :]
         tensor_dict['column_mask'] = tensor_dict['table_mask'][:, 0, :]
 
