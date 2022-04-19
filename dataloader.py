@@ -93,8 +93,8 @@ class TableDataset(Dataset):
 
     def __getitem__(self, index):
         target_ids = self.target[index]["input_ids"].squeeze()
-        table = self.tables[index].tokenize(self.encoder_tokenizer)
-        context = self.encoder_tokenizer.tokenize(self.contexts[index])
+        table = self.tables[index]
+        context = self.contexts[index]
         return {"table": table, "context": context, "target_ids": target_ids}
 
     def collate_fn(self, batch):
