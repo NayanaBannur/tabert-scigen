@@ -15,8 +15,6 @@ from torch.utils.data import DataLoader
 
 from transformers import (
     AdamW,
-    EncoderDecoderModel,
-    EncoderDecoderConfig,
     BartConfig,
     get_linear_schedule_with_warmup,
     BartForConditionalGeneration,
@@ -67,11 +65,15 @@ class Seq2SeqTableBertModel(pl.LightningModule):
             **config_kwargs
         )
 
-        self.config = EncoderDecoderConfig.from_encoder_decoder_configs(self.config_encoder, self.config_decoder)
+        self.encoder = TableBertModel.from_pretrained(
+            '/Users/nayana/Desktop/CMU/Spring 2022/10-707/TaBERT/tabert_base_k3/model.bin',
+        )
 
-        self.model = EncoderDecoderModel.from_encoder_decoder_pretrained(
-            f'{ENCODER_PATH}/model.bin',
-            self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path
+        self.decoder = BartForConditionalGeneration.from_pretrained(
+            self.hparams.model_name_or_path,
+            from_tf=bool(".ckpt" in self.hparams.model_name_or_path),
+            config=self.config,
+            cache_dir=cache_dir,
         )
 
         self.tokenizer_decoder = BartTokenizer.from_pretrained(
@@ -91,24 +93,24 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         self.count_valid_epoch = 0
 
     def is_logger(self):
-        # return self.trainer.proc_rank <= 0
         return True
 
     def configure_optimizers(self):
         "Prepare optimizer and schedule (linear warmup and decay)"
 
-        model = self.model
+        optimizer_grouped_parameters = []
         no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": self.hparams.weight_decay,
-            },
-            {
-                "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
-                "weight_decay": 0.0,
-            },
-        ]
+        for model in [self.encoder, self.decoder]:
+            optimizer_grouped_parameters.extend([
+                {
+                    "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
+                    "weight_decay": self.hparams.weight_decay,
+                },
+                {
+                    "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
+                    "weight_decay": 0.0,
+                },
+            ])
         optimizer = AdamW(optimizer_grouped_parameters, lr=self.hparams.learning_rate, eps=self.hparams.adam_epsilon)
         self.opt = optimizer
         return [optimizer]
