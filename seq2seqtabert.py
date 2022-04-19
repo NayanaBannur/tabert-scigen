@@ -197,10 +197,10 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         loss = self._step(batch)
         return {"val_loss": loss, "preds": preds, "target": target}
 
-    def validation_step(self, batch):
+    def validation_step(self, batch, batch_idx):
         return self._generation_common(batch)
 
-    def test_step(self, batch):
+    def test_step(self, batch, batch_idx):
         return self._generation_common(batch)
 
     def test_epoch_end(self, outputs):

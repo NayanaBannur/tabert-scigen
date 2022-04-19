@@ -6,7 +6,7 @@ python seq2seqtabert.py \
 --train_batch_size=2 \
 --eval_batch_size=2 \
 --test_batch_size=2 \
---n_gpu 0 \
+--n_gpu 1 \
 --do_train \
 --do_predict \
 --test_type='CL' \

@@ -95,8 +95,8 @@ class TableDataset(Dataset):
 
     def __getitem__(self, index):
         target_ids = self.target[index]["input_ids"].squeeze()
-        table = self.tables[index]
-        context = self.contexts[index]
+        table = [self.tables[index]]
+        context = [self.contexts[index]]
         tensor_dict, instances = self.encoder.to_tensor_dict(context, table)
         tensor_dict = {
             k: v.to(self.encoder.device) if torch.is_tensor(v) else v
