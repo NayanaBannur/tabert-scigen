@@ -36,7 +36,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG,
                     format='%(asctime)s %(module)s - %(funcName)s: %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
 
-MODEL = '/Users/nayana/Desktop/CMU/Spring 2022/10-707/TaBERT/tabert_base_k3/model.bin'
+ENCODER_PATH = '/Users/nayana/Desktop/CMU/Spring 2022/10-707/TaBERT/tabert_base_k3/'
 
 
 def set_seed(args: argparse.Namespace):
@@ -57,6 +57,8 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
         cache_dir = self.hparams.cache_dir if self.hparams.cache_dir else None
 
+        self.config_encoder = TableBertConfig.from_file(f'{ENCODER_PATH}/tb_config.bin')
+
         self.config_decoder = BartConfig.from_pretrained(
             self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path,
             **({"num_labels": num_labels} if num_labels is not None else {}),
@@ -65,15 +67,12 @@ class Seq2SeqTableBertModel(pl.LightningModule):
             **config_kwargs
         )
 
-        self.encoder = TableBertModel.from_pretrained(
-            '/Users/nayana/Desktop/CMU/Spring 2022/10-707/TaBERT/tabert_base_k3/model.bin',
-        )
-
-        self.config_encoder = self.encoder.config
-
         self.config = EncoderDecoderConfig.from_encoder_decoder_configs(self.config_encoder, self.config_decoder)
 
-        self.model = EncoderDecoderModel(config=self.config)
+        self.model = EncoderDecoderModel.from_encoder_decoder_pretrained(
+            f'{ENCODER_PATH}/model.bin',
+            self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path
+        )
 
         self.tokenizer_decoder = BartTokenizer.from_pretrained(
             self.hparams.tokenizer_name if self.hparams.tokenizer_name else self.hparams.model_name_or_path,
