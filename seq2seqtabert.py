@@ -212,7 +212,12 @@ class Seq2SeqTableBertModel(pl.LightningModule):
             ),
         )
 
-    def forward(self, tensor_dict=None, decoder_input_ids=None, labels=None):
+    def forward(self, contexts=None, tables=None, decoder_input_ids=None, labels=None):
+        tensor_dict, instances = self.encoder.to_tensor_dict(contexts, tables)
+        tensor_dict = {
+            k: v.to(self.encoder.device) if torch.is_tensor(v) else v
+            for k, v in tensor_dict.items()
+        }
         context_encoding, schema_encoding = self.encoder.forward(**tensor_dict)
         tensor_dict['context_token_mask'] = tensor_dict['context_token_mask'][:, 0, :]
         tensor_dict['column_mask'] = tensor_dict['table_mask'][:, 0, :]
@@ -242,7 +247,13 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         return {"loss": loss, "log": tensorboard_logs}
 
     def _generation_common(self, batch):
-        tensor_dict, y = batch["tensor_dict"], batch["target_ids"]
+        contexts, tables, y = batch["contexts"], batch["tables"], batch["target_ids"]
+        tensor_dict, instances = self.encoder.to_tensor_dict(contexts, tables)
+        tensor_dict = {
+            k: v.to(self.encoder.device) if torch.is_tensor(v) else v
+            for k, v in tensor_dict.items()
+        }
+
         context_encoding, schema_encoding = self.encoder.forward(**tensor_dict)
         tensor_dict['context_token_mask'] = tensor_dict['context_token_mask'][:, 0, :]
         tensor_dict['column_mask'] = tensor_dict['table_mask'][:, 0, :]
@@ -383,10 +394,10 @@ class Seq2SeqTableBertModel(pl.LightningModule):
             writer.close()
 
     def get_dataloader(self, type_path: str, batch_size: int, shuffle: bool = False) -> DataLoader:
-        dataset = TableDataset(self.encoder, self.tokenizer_encoder, self.tokenizer_decoder, type_path=type_path,
+        dataset = TableDataset(self.tokenizer_encoder, self.tokenizer_decoder, type_path=type_path,
                                **self.dataset_kwargs)
         logger.info('loading %s dataloader...', type_path)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0,
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4,
                                 collate_fn=dataset.collate_fn)
         logger.info('done')
         return dataloader

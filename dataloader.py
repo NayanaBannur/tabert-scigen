@@ -73,7 +73,6 @@ def get_tables(data_dir='./data/dataset/train/few-shot/', file='train.json', tok
 class TableDataset(Dataset):
     def __init__(
             self,
-            encoder,
             tokenizer_encoder,
             tokenizer_decoder,
             data_dir=None,
@@ -81,7 +80,6 @@ class TableDataset(Dataset):
             max_target_length=512
     ):
         super().__init__()
-        self.encoder = encoder
         self.encoder_tokenizer = tokenizer_encoder
         self.decoder_tokenizer = tokenizer_decoder
 
@@ -102,11 +100,6 @@ class TableDataset(Dataset):
     def collate_fn(self, batch):
         contexts = [x["context"] for x in batch]
         tables = [x["table"] for x in batch]
-        tensor_dict, instances = self.encoder.to_tensor_dict(contexts, tables)
-        tensor_dict = {
-            k: v.to(self.encoder.device) if torch.is_tensor(v) else v
-            for k, v in tensor_dict.items()
-        }
         
         target_ids = torch.stack([x["target_ids"] for x in batch])
-        return {"tensor_dict": tensor_dict, "target_ids": target_ids}
+        return {"contexts": contexts, "tables": tables, "target_ids": target_ids}
