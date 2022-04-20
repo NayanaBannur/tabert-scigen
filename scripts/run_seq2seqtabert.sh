@@ -2,10 +2,10 @@ python seq2seqtabert.py \
 --data_dir=./ \
 --model_name_or_path=facebook/bart-large \
 --learning_rate=3e-5 \
---num_train_epochs 30 \
---train_batch_size=2 \
---eval_batch_size=2 \
---test_batch_size=2 \
+--num_train_epochs 1 \
+--train_batch_size=1 \
+--eval_batch_size=1 \
+--test_batch_size=1 \
 --n_gpu 1 \
 --do_train \
 --do_predict \
