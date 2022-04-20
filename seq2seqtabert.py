@@ -49,7 +49,7 @@ def set_seed(args: argparse.Namespace):
         torch.cuda.manual_seed_all(args.seed)
 
 
-class BartGenerator(BartPretrainedModel):
+class BartGenerator(BartForConditionalGeneration):
     base_model_prefix = "generator"
     _keys_to_ignore_on_load_missing = [r"final_logits_bias", r"lm_head\.weight"]
 
@@ -62,11 +62,16 @@ class BartGenerator(BartPretrainedModel):
             cache_dir=cache_dir
         )
 
+        bart_model.resize_token_embeddings(768)
+
         self.config = config
 
         self.decoder = bart_model.get_decoder()
         self.register_buffer("final_logits_bias", torch.zeros((1, bart_model.model.shared.num_embeddings)))
         self.lm_head = bart_model.lm_head
+
+        new_embeddings = self.resize_token_embeddings(768)
+        self.set_output_embeddings(new_embeddings)
 
     def forward(self, input_ids=None, encoder_outputs=None, mask=None, labels=None, return_dict=False, 
             output_attentions=False, output_hidden_states=None):
@@ -108,15 +113,15 @@ class BartGenerator(BartPretrainedModel):
             encoder_attentions=outputs.encoder_attentions,
         )
 
-    @staticmethod
-    def _reorder_cache(past, beam_idx):
-        reordered_past = ()
-        for layer_past in past:
-            # cached cross_attention states don't have to be reordered -> they are always the same
-            reordered_past += (
-                tuple(past_state.index_select(0, beam_idx) for past_state in layer_past[:2]) + layer_past[2:],
-            )
-        return reordered_past
+    # @staticmethod
+    # def _reorder_cache(past, beam_idx):
+    #     reordered_past = ()
+    #     for layer_past in past:
+    #         # cached cross_attention states don't have to be reordered -> they are always the same
+    #         reordered_past += (
+    #             tuple(past_state.index_select(0, beam_idx) for past_state in layer_past[:2]) + layer_past[2:],
+    #         )
+    #     return reordered_past
 
 
 class Seq2SeqTableBertModel(pl.LightningModule):
