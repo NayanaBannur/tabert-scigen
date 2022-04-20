@@ -63,7 +63,7 @@ class BartGenerator(BartPretrainedModel):
             cache_dir=cache_dir
         )
 
-        bart_model.resize_token_embeddings(768)
+        # bart_model.resize_token_embeddings(768)
 
         self.config = config
         self.shared = bart_model.model.shared
@@ -179,6 +179,12 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
         self.generator = BartGenerator(self.hparams.model_name_or_path, self.config_decoder, cache_dir)
 
+        if (
+                self.encoder.config.hidden_size != self.generator.decoder.config.hidden_size
+                and self.generator.decoder.config.cross_attention_hidden_size is None
+        ):
+            self.enc_to_dec_proj = nn.Linear(self.encoder.config.hidden_size, self.generator.decoder.config.hidden_size)
+
         self.tokenizer_encoder = self.encoder.tokenizer
 
         self.tokenizer_decoder = BartTokenizer.from_pretrained(
@@ -204,7 +210,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
         optimizer_grouped_parameters = []
         no_decay = ["bias", "LayerNorm.weight"]
-        for model in [self.encoder, self.generator]:
+        for model in [self.encoder, self.generator, self.enc_to_dec_proj]:
             optimizer_grouped_parameters.extend([
                 {
                     "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
@@ -255,6 +261,12 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
         encoder_outputs = torch.cat([context_encoding, schema_encoding], dim=1)
         mask = torch.cat([tensor_dict['context_token_mask'], tensor_dict['column_mask']], dim=1)
+
+        if (
+                self.encoder.config.hidden_size != self.decoder.config.hidden_size
+                and self.decoder.config.cross_attention_hidden_size is None
+        ):
+            encoder_outputs = self.enc_to_dec_proj(encoder_outputs)
 
         return self.generator.forward(input_ids=decoder_input_ids, encoder_outputs=encoder_outputs,
                                       mask=mask, labels=labels)
