@@ -18,7 +18,8 @@ from transformers import (
     BartConfig,
     get_linear_schedule_with_warmup,
     BartForConditionalGeneration,
-    BartTokenizer
+    BartTokenizer,
+    BartPretrainedModel
 )
 
 from transformers.modeling_outputs import Seq2SeqModelOutput, Seq2SeqLMOutput
@@ -48,6 +49,64 @@ def set_seed(args: argparse.Namespace):
         torch.cuda.manual_seed_all(args.seed)
 
 
+
+class BartGenerator(BartPretrainedModel):
+    def __init__(self, model_name_or_path, config, cache_dir):
+        super().__init__()
+        bart_model = BartForConditionalGeneration.from_pretrained(
+            model_name_or_path,
+            from_tf=bool(".ckpt" in model_name_or_path),
+            config=config,
+            cache_dir=cache_dir
+        )
+
+        self.config = config
+
+        self.decoder = bart_model.get_decoder()
+
+        self.lm_head = bart_model.lm_head
+
+    def forward(self, decoder_input_ids=None, encoder_outputs=None, mask=None, labels=None):
+        return_dict = self.config.use_return_dict
+
+        decoder_outputs = self.decoder.forward(input_ids=decoder_input_ids, encoder_hidden_states=encoder_outputs,
+                                               encoder_attention_mask=mask, labels=labels)
+
+        outputs = Seq2SeqModelOutput(
+            last_hidden_state=decoder_outputs.last_hidden_state,
+            past_key_values=decoder_outputs.past_key_values,
+            decoder_hidden_states=decoder_outputs.hidden_states,
+            decoder_attentions=decoder_outputs.attentions,
+            cross_attentions=decoder_outputs.cross_attentions,
+            encoder_last_hidden_state=encoder_outputs,
+            encoder_hidden_states=encoder_outputs,
+            encoder_attentions=mask
+        )
+
+        lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
+
+        masked_lm_loss = None
+        if labels is not None:
+            loss_fct = CrossEntropyLoss()
+            masked_lm_loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
+
+        if not return_dict:
+            output = (lm_logits,) + outputs[1:]
+            return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
+
+        return Seq2SeqLMOutput(
+            loss=masked_lm_loss,
+            logits=lm_logits,
+            past_key_values=outputs.past_key_values,
+            decoder_hidden_states=outputs.decoder_hidden_states,
+            decoder_attentions=outputs.decoder_attentions,
+            cross_attentions=outputs.cross_attentions,
+            encoder_last_hidden_state=outputs.encoder_last_hidden_state,
+            encoder_hidden_states=outputs.encoder_hidden_states,
+            encoder_attentions=outputs.encoder_attentions,
+        )
+
+
 class Seq2SeqTableBertModel(pl.LightningModule):
 
     val_metric = "mover"
@@ -75,16 +134,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
             f'{ENCODER_PATH}/model.bin',
         )
 
-        bart_model = BartForConditionalGeneration.from_pretrained(
-            self.hparams.model_name_or_path,
-            from_tf=bool(".ckpt" in self.hparams.model_name_or_path),
-            config=self.config_decoder,
-            cache_dir=cache_dir,
-        )
-
-        self.decoder = bart_model.get_decoder()
-
-        self.lm_head = bart_model.lm_head
+        self.generator = BartGenerator(self.hparams.model_name_or_path, self.config_decoder, cache_dir)
 
         self.tokenizer_encoder = self.encoder.tokenizer
 
@@ -99,7 +149,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
         self.dataset_kwargs: dict = dict(
             data_dir=self.hparams.data_dir,
-            max_target_length=self.hparams.max_target_length,
+            max_target_length=self.hparams.max_target_length
         )
         self.count_valid_epoch = 0
 
@@ -111,7 +161,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
         optimizer_grouped_parameters = []
         no_decay = ["bias", "LayerNorm.weight"]
-        for model in [self.encoder, self.decoder, self.lm_head]:
+        for model in [self.encoder, self.generator]:
             optimizer_grouped_parameters.extend([
                 {
                     "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
@@ -151,7 +201,6 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         )
 
     def forward(self, tensor_dict=None, decoder_input_ids=None, labels=None):
-        return_dict = self.config.use_return_dict
 
         context_encoding, schema_encoding = self.encoder.forward(**tensor_dict)
         tensor_dict['context_token_mask'] = tensor_dict['context_token_mask'][:, 0, :]
@@ -160,42 +209,9 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         encoder_outputs = torch.cat([context_encoding, schema_encoding], dim=1)
         mask = torch.cat([tensor_dict['context_token_mask'], tensor_dict['column_mask']], dim=1)
 
-        decoder_outputs = self.decoder.forward(input_ids=decoder_input_ids, encoder_hidden_states=encoder_outputs,
-                                               encoder_attention_mask=mask, labels=labels)
+        return self.generator.forward(decoder_input_ids=decoder_input_ids, encoder_outputs=encoder_outputs,
+                                      mask=mask, labels=labels)
 
-        outputs = Seq2SeqModelOutput(
-            last_hidden_state=decoder_outputs.last_hidden_state,
-            past_key_values=decoder_outputs.past_key_values,
-            decoder_hidden_states=decoder_outputs.hidden_states,
-            decoder_attentions=decoder_outputs.attentions,
-            cross_attentions=decoder_outputs.cross_attentions,
-            encoder_last_hidden_state=encoder_outputs,
-            encoder_hidden_states=encoder_outputs,
-            encoder_attentions=mask,
-        )
-
-        lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
-
-        masked_lm_loss = None
-        if labels is not None:
-            loss_fct = CrossEntropyLoss()
-            masked_lm_loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
-
-        if not return_dict:
-            output = (lm_logits,) + outputs[1:]
-            return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
-
-        return Seq2SeqLMOutput(
-            loss=masked_lm_loss,
-            logits=lm_logits,
-            past_key_values=outputs.past_key_values,
-            decoder_hidden_states=outputs.decoder_hidden_states,
-            decoder_attentions=outputs.decoder_attentions,
-            cross_attentions=outputs.cross_attentions,
-            encoder_last_hidden_state=outputs.encoder_last_hidden_state,
-            encoder_hidden_states=outputs.encoder_hidden_states,
-            encoder_attentions=outputs.encoder_attentions,
-        )
 
     def _step(self, batch):
         pad_token_id = self.tokenizer_decoder.pad_token_id
@@ -224,7 +240,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         mask = torch.cat([tensor_dict['context_token_mask'], tensor_dict['column_mask']], dim=1)
         # NOTE: the following kwargs get more speed and lower quality summaries than those in evaluate_cnn.py
 
-        generated_ids = self.decoder.generate(
+        generated_ids = self.generator.generate(
             input_ids=None,
             attention_mask=mask,
             encoder_outputs=encoding,
