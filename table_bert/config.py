@@ -66,6 +66,8 @@ BERT_CONFIGS = {
 
 
 class TableBertConfig(SimpleNamespace):
+    model_type = 'bert'
+
     def __init__(
         self,
         base_model_name: str = 'bert-base-uncased',
