@@ -137,6 +137,10 @@ class BartGenerator(BartPretrainedModel):
     def get_input_embeddings(self):
         return self.shared
 
+    def set_input_embeddings(self, value):
+        self.shared = value
+        self.decoder.embed_tokens = self.shared
+
     @staticmethod
     def _reorder_cache(past, beam_idx):
         reordered_past = ()
