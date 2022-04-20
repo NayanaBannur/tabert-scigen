@@ -18,8 +18,7 @@ from transformers import (
     BartConfig,
     get_linear_schedule_with_warmup,
     BartForConditionalGeneration,
-    BartTokenizer,
-    EncoderDecoderModel
+    BartTokenizer
 )
 
 from transformers.modeling_outputs import Seq2SeqModelOutput, Seq2SeqLMOutput
@@ -72,7 +71,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
             **config_kwargs
         )
 
-        encoder = TableBertModel.from_pretrained(
+        self.encoder = TableBertModel.from_pretrained(
             f'{ENCODER_PATH}/model.bin',
         )
 
@@ -83,9 +82,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
             cache_dir=cache_dir,
         )
 
-        self.model = EncoderDecoderModel(encoder=encoder, decoder=bart_model.get_decoder())
-        self.decoder = self.model.get_decoder()
-        self.encoder = self.model.get_encoder()
+        self.decoder = bart_model.get_decoder()
 
         self.lm_head = bart_model.lm_head
 
@@ -114,7 +111,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
         optimizer_grouped_parameters = []
         no_decay = ["bias", "LayerNorm.weight"]
-        for model in [self.model, self.lm_head]:
+        for model in [self.encoder, self.decoder, self.lm_head]:
             optimizer_grouped_parameters.extend([
                 {
                     "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
