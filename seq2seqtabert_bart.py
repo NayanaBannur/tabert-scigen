@@ -263,8 +263,8 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         mask = torch.cat([tensor_dict['context_token_mask'], tensor_dict['column_mask']], dim=1)
 
         if (
-                self.encoder.config.hidden_size != self.decoder.config.hidden_size
-                and self.decoder.config.cross_attention_hidden_size is None
+                self.encoder.config.hidden_size != self.generator.decoder.config.hidden_size
+                and self.generator.decoder.config.cross_attention_hidden_size is None
         ):
             encoder_outputs = self.enc_to_dec_proj(encoder_outputs)
 
