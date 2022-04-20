@@ -63,7 +63,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         self.config_encoder = TableBertConfig.from_file(f'{ENCODER_PATH}/tb_config.json')
 
         self.config_decoder = BertConfig.from_pretrained(
-            'bert_base_uncased',
+            'bert-base-uncased',
             **({"num_labels": num_labels} if num_labels is not None else {}),
             cache_dir=cache_dir,
             **config_kwargs
@@ -72,9 +72,9 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         self.config = EncoderDecoderConfig(self.config_encoder, self.config_decoder)
 
         encoder = TableBertModel.from_pretrained(f'{ENCODER_PATH}/model.bin')
-        decoder = TableBertModel.from_pretrained('bert_base_uncased')
+        decoder = TableBertModel.from_pretrained('bert-base-uncased')
 
-        self.tokenizer = BertTokenizer.from_pretrained('bert_base_uncased',cache_dir=cache_dir)
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased',cache_dir=cache_dir)
 
         self.model = EncoderDecoderModel(encoder=encoder, decoder=decoder)
         self.encoder = self.model.get_encoder()
