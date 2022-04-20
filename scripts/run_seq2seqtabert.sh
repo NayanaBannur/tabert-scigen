@@ -1,6 +1,6 @@
 python seq2seqtabert.py \
 --data_dir=./ \
---model_name_or_path=bart-large \
+--model_name_or_path=facebook/bart-large \
 --learning_rate=3e-5 \
 --num_train_epochs 30 \
 --train_batch_size=2 \
