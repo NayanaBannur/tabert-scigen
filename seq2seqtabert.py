@@ -12,9 +12,9 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader
+from torch.optim import AdamW
 
 from transformers import (
-    AdamW,
     BartConfig,
     get_linear_schedule_with_warmup,
     BartForConditionalGeneration,
@@ -228,14 +228,13 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         return self.generator.forward(input_ids=decoder_input_ids, encoder_outputs=encoder_outputs,
                                       mask=mask, labels=labels)
 
-
     def _step(self, batch):
         pad_token_id = self.tokenizer_decoder.pad_token_id
-        tensor_dict, y = batch["tensor_dict"], batch["target_ids"]
+        contexts, tables, y = batch["contexts"], batch["tables"], batch["target_ids"]
         y_ids = y[:, :-1].contiguous()
         labels = y[:, 1:].clone()
         labels[y[:, 1:] == pad_token_id] = -100
-        outputs = self(tensor_dict=tensor_dict, decoder_input_ids=y_ids, labels=labels)
+        outputs = self(contexts=contexts, tables=tables,  decoder_input_ids=y_ids, labels=labels)
         loss = outputs[0]
 
         return loss
