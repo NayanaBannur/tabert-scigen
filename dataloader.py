@@ -107,5 +107,6 @@ class TableDataset(Dataset):
             k: v.to(self.encoder.device) if torch.is_tensor(v) else v
             for k, v in tensor_dict.items()
         }
+        
         target_ids = torch.stack([x["target_ids"] for x in batch])
         return {"tensor_dict": tensor_dict, "target_ids": target_ids}

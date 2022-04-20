@@ -49,10 +49,12 @@ def set_seed(args: argparse.Namespace):
         torch.cuda.manual_seed_all(args.seed)
 
 
-
 class BartGenerator(BartPretrainedModel):
+    base_model_prefix = "generator"
+    _keys_to_ignore_on_load_missing = [r"final_logits_bias", r"lm_head\.weight"]
+
     def __init__(self, model_name_or_path, config, cache_dir):
-        super().__init__()
+        super().__init__(config)
         bart_model = BartForConditionalGeneration.from_pretrained(
             model_name_or_path,
             from_tf=bool(".ckpt" in model_name_or_path),
@@ -63,14 +65,14 @@ class BartGenerator(BartPretrainedModel):
         self.config = config
 
         self.decoder = bart_model.get_decoder()
-
+        self.register_buffer("final_logits_bias", torch.zeros((1, bart_model.model.shared.num_embeddings)))
         self.lm_head = bart_model.lm_head
 
-    def forward(self, decoder_input_ids=None, encoder_outputs=None, mask=None, labels=None):
-        return_dict = self.config.use_return_dict
+    def forward(self, input_ids=None, encoder_outputs=None, mask=None, labels=None, return_dict=False, 
+            output_attentions=False, output_hidden_states=None):
 
-        decoder_outputs = self.decoder.forward(input_ids=decoder_input_ids, encoder_hidden_states=encoder_outputs,
-                                               encoder_attention_mask=mask, labels=labels)
+        decoder_outputs = self.decoder.forward(input_ids=input_ids, encoder_hidden_states=encoder_outputs,
+                                               encoder_attention_mask=mask)
 
         outputs = Seq2SeqModelOutput(
             last_hidden_state=decoder_outputs.last_hidden_state,
@@ -105,6 +107,16 @@ class BartGenerator(BartPretrainedModel):
             encoder_hidden_states=outputs.encoder_hidden_states,
             encoder_attentions=outputs.encoder_attentions,
         )
+
+    @staticmethod
+    def _reorder_cache(past, beam_idx):
+        reordered_past = ()
+        for layer_past in past:
+            # cached cross_attention states don't have to be reordered -> they are always the same
+            reordered_past += (
+                tuple(past_state.index_select(0, beam_idx) for past_state in layer_past[:2]) + layer_past[2:],
+            )
+        return reordered_past
 
 
 class Seq2SeqTableBertModel(pl.LightningModule):
@@ -201,7 +213,6 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         )
 
     def forward(self, tensor_dict=None, decoder_input_ids=None, labels=None):
-
         context_encoding, schema_encoding = self.encoder.forward(**tensor_dict)
         tensor_dict['context_token_mask'] = tensor_dict['context_token_mask'][:, 0, :]
         tensor_dict['column_mask'] = tensor_dict['table_mask'][:, 0, :]
@@ -209,7 +220,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
         encoder_outputs = torch.cat([context_encoding, schema_encoding], dim=1)
         mask = torch.cat([tensor_dict['context_token_mask'], tensor_dict['column_mask']], dim=1)
 
-        return self.generator.forward(decoder_input_ids=decoder_input_ids, encoder_outputs=encoder_outputs,
+        return self.generator.forward(input_ids=decoder_input_ids, encoder_outputs=encoder_outputs,
                                       mask=mask, labels=labels)
 
 
@@ -242,7 +253,7 @@ class Seq2SeqTableBertModel(pl.LightningModule):
 
         generated_ids = self.generator.generate(
             input_ids=None,
-            attention_mask=mask,
+            mask=mask,
             encoder_outputs=encoding,
             num_beams=5,
             max_length=512,
