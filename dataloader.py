@@ -12,14 +12,15 @@ from table_bert import Table, Column
 nlp_model = spacy.load('en_core_web_sm')
 
 
-def encode_file_bart(tokenizer, texts, max_length, padding=True, return_tensors="pt"):
+def encode_file_bart(tokenizer, data_path, max_length, padding=True, return_tensors="pt"):
     examples = []
-    for text in tqdm(texts):
-        tokenized = tokenizer.batch_encode_plus(
-            [text.strip()], truncation=True, max_length=max_length, padding=padding,
-            return_tensors=return_tensors
-        )
-        examples.append(tokenized)
+    with open(data_path, "r") as f:
+        for text in tqdm(f.readlines()):
+            tokenized = tokenizer.batch_encode_plus(
+                [text.strip()], truncation=True, max_length=max_length, padding=padding,
+                return_tensors=return_tensors
+            )
+            examples.append(tokenized)
     return examples
 
 
