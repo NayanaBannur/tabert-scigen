@@ -66,7 +66,7 @@ class BartGenerator(BartPretrainedModel):
         bart_model.resize_token_embeddings(768)
 
         self.config = config
-        self.shared = bart_model.shared
+        self.shared = bart_model.model.shared
         self.decoder = bart_model.get_decoder()
         self.register_buffer("final_logits_bias", torch.zeros((1, bart_model.model.shared.num_embeddings)))
         self.lm_head = bart_model.lm_head
